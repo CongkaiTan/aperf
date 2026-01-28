@@ -1,0 +1,67 @@
+name: Cross-Platform CI
+
+on:
+  pull_request:
+    branches:
+      - "**"
+  workflow_call: # Needed to make this a reusable workflow for releasing artifacts
+  workflow_dispatch: # To allow starting the workflow manually in the web ui
+
+permissions:
+  contents: read
+
+jobs:
+  CI:
+    strategy:
+      matrix:
+        platform: [MacOS, Windows]
+        include:
+          - artifact-name: macos-release-artifacts
+            target: x86_64-apple-darwin
+          - artifact-name: windows-release-artifacts
+            target: x86_64-pc-windows-msvc
+    runs-on: codebuild-${{ github.event.repository.name }}-${{ matrix.platform }}-Runner-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@446798f8213ac2e75931c1b0769676d927801858 # v2.10.3
+        with:
+          egress-policy: audit
+      - name: Checkout repository
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
+
+      # Prepare build dependencies
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Install Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 16.16.0
+
+      # Tests and static analysis (without hotline feature)
+      - name: Run tests
+        run: cargo test --verbose -- --nocapture --color always
+      - name: Run clippy
+        run: cargo clippy --all-targets
+      - name: Run rustfmt
+        run: cargo fmt --all -- --check
+
+      # Build release artifacts
+      - name: Build release artifacts
+        run: cargo build --release --target ${{ matrix.target }}
+
+      # Archive and upload artifacts
+      - name: Archive release artifacts (Unix)
+        if: runner.os != 'Windows'
+        run: tar -zcvf artifacts.tar.gz -C target/${{ matrix.target }}/release aperf
+      - name: Archive release artifacts (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar -zcvf ../../../artifacts.tar.gz aperf.exe
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: artifacts.tar.gz
