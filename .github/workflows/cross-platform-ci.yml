@@ -14,13 +14,15 @@ jobs:
   CI:
     strategy:
       matrix:
-        platform: [MacOS, Windows]
+        os: [macos-latest, windows-latest]
         include:
-          - artifact-name: macos-release-artifacts
+          - os: macos-latest
+            artifact-name: macos-release-artifacts
             target: x86_64-apple-darwin
-          - artifact-name: windows-release-artifacts
+          - os: windows-latest
+            artifact-name: windows-release-artifacts
             target: x86_64-pc-windows-msvc
-    runs-on: codebuild-${{ github.event.repository.name }}-${{ matrix.platform }}-Runner-${{ github.run_id }}-${{ github.run_attempt }}
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@446798f8213ac2e75931c1b0769676d927801858 # v2.10.3
@@ -29,11 +31,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
 
-     # Prepare build dependencies
+      # Prepare build dependencies
       - name: Install Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
           components: rustfmt, clippy
       - name: Install Node
         uses: actions/setup-node@v5
