@@ -15,13 +15,6 @@ jobs:
     strategy:
       matrix:
         os: [macos-latest, windows-latest]
-        include:
-          - os: macos-latest
-            artifact-name: macos-release-artifacts
-            target: x86_64-apple-darwin
-          - os: windows-latest
-            artifact-name: windows-release-artifacts
-            target: x86_64-pc-windows-msvc
     runs-on: ${{ matrix.os }}
     steps:
       - name: Harden Runner
@@ -41,7 +34,7 @@ jobs:
         with:
           node-version: 16.16.0
 
-      # Tests and static analysis (without hotline feature)
+      # Tests and static analysis
       - name: Run tests
         run: cargo test --verbose -- --nocapture --color always
       - name: Run clippy
@@ -51,19 +44,24 @@ jobs:
 
       # Build release artifacts
       - name: Build release artifacts
-        run: cargo build --release --target ${{ matrix.target }}
+        run: cargo build --release
 
       # Archive and upload artifacts
-      - name: Archive release artifacts (Unix)
-        if: runner.os != 'Windows'
-        run: tar -zcvf artifacts.tar.gz -C target/${{ matrix.target }}/release aperf
-      - name: Archive release artifacts (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          cd target/${{ matrix.target }}/release
-          tar -zcvf ../../../artifacts.tar.gz aperf.exe
-      - name: Upload release artifacts
+      - name: Archive Mac release artifacts
+        if: ${{ matrix.os == 'macos-latest' }}
+        run: tar -zcvf artifacts.tar.gz -C target/release aperf
+      - name: Archive Windows release artifacts
+        if: ${{ matrix.os == 'windows-latest' }}
+        run: tar -zcvf artifacts.tar.gz aperf.exe
+      - name: Upload Mac release artifacts
         uses: actions/upload-artifact@v4
+        if: ${{ matrix.os == 'macos-latest' }}
         with:
-          name: ${{ matrix.artifact-name }}
+          name: macos-release-artifacts
+          path: artifacts.tar.gz
+      - name: Upload Windows release artifacts
+        uses: actions/upload-artifact@v4
+        if: ${{ matrix.os == 'windows-latest' }}
+        with:
+          name: windows-release-artifacts
           path: artifacts.tar.gz
